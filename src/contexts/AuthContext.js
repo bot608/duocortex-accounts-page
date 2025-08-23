@@ -77,7 +77,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     initAuth();
-  }, []);
+  }, [validating, initialized]);
 
   // Handle login with email and password
   const login = async (email, password) => {

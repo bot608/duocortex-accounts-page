@@ -31,7 +31,7 @@ export default function Transactions() {
 
   useEffect(() => {
     applyFilters();
-  }, [transactions, filter, dateRange, applyFilters]);
+  }, [transactions, filter, dateRange]);
 
   const fetchTransactions = async () => {
     try {

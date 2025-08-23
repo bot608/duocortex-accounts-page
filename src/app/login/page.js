@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -142,10 +143,12 @@ export default function Login() {
                 onClick={handleGoogleSignIn}
                 className="w-full flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 border-gray-300"
               >
-                <img
+                <Image
                   src="https://developers.google.com/identity/images/g-logo.png"
                   alt="Google"
-                  className="w-5 h-5 mr-2"
+                  width={20}
+                  height={20}
+                  className="mr-2"
                 />
                 Continue with Google
               </button>
