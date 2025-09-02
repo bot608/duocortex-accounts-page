@@ -1,7 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { validateToken, getCurrentUser, setAuthData, clearAuthData, isAuthenticated, needsRevalidation, authenticateUser } from '@/lib/auth';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { validateToken, getCurrentUser, setAuthData, clearAuthData, isAuthenticated, needsRevalidation, authenticateUser, updateLastValidation } from '@/lib/auth';
 
 const AuthContext = createContext(null);
 
@@ -42,6 +42,8 @@ export const AuthProvider = ({ children }) => {
               if (validation.valid && validation.user) {
                 setUser(validation.user);
                 setAuthenticated(true);
+                // Update validation timestamp to prevent immediate re-validation
+                updateLastValidation();
               } else {
                 // Token is invalid, clear auth data
                 clearAuthData();
@@ -125,8 +127,8 @@ export const AuthProvider = ({ children }) => {
     setAuthData(localStorage.getItem('accessToken'), userData);
   };
 
-  // Refresh user data from backend
-  const refreshUser = async () => {
+  // Refresh user data from backend - memoized to prevent infinite loops
+  const refreshUser = useCallback(async () => {
     try {
       const token = localStorage.getItem('accessToken');
       if (token) {
@@ -134,6 +136,8 @@ export const AuthProvider = ({ children }) => {
         if (validation.valid && validation.user) {
           setUser(validation.user);
           setAuthData(token, validation.user);
+          // Update validation timestamp to prevent immediate re-validation
+          updateLastValidation();
           return validation.user;
         }
       }
@@ -141,7 +145,7 @@ export const AuthProvider = ({ children }) => {
       console.error('Error refreshing user:', error);
     }
     return null;
-  };
+  }, []); // Empty dependency array since it only depends on localStorage and API calls
 
   const value = {
     user,

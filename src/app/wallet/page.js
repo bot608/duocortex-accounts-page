@@ -77,40 +77,15 @@ export default function Wallet() {
         throw new Error('Failed to create payment session');
       }
 
-      // Initiate payment
-      const paymentResult = await initiatePayment(sessionData.payment_session_id, {
-        onSuccess: async (data) => {
-          console.log('Payment successful:', data);
-          
-          // Verify payment
-          const verification = await verifyPayment(data.order_id);
-          
-          if (verification.status === 'SUCCESS') {
-            setSuccess(`Successfully added ₹${amount} to your wallet!`);
-            
-            // Refresh user data from backend to get updated coins
-            if (refreshUser) {
-              await refreshUser();
-            }
-            
-            setAmount('');
-            
-            // Redirect to dashboard after success
-            setTimeout(() => {
-              router.push('/dashboard');
-            }, 2000);
-          } else {
-            throw new Error('Payment verification failed');
-          }
-        },
+      // Initiate payment - this will redirect to payment gateway
+      await initiatePayment(sessionData.payment_session_id, {
         onFailure: (data) => {
           console.error('Payment failed:', data);
           setError('Payment failed. Please try again.');
-        },
-        onCancel: () => {
-          setError('Payment was cancelled.');
         }
       });
+      
+      // Note: After successful payment, user will be redirected to /payment-status page
 
     } catch (err) {
       console.error('Payment error:', err);

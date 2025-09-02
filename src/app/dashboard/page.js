@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Card from "@/components/ui/Card";
@@ -9,6 +9,7 @@ import LoadingSpinner from "@/components/ui/LoadingSpinner";
 export default function Dashboard() {
   const { user, authenticated, loading, refreshUser } = useAuth();
   const router = useRouter();
+  const hasRefreshed = useRef(false);
 
   useEffect(() => {
     if (!loading && !authenticated) {
@@ -17,18 +18,12 @@ export default function Dashboard() {
   }, [authenticated, loading, router]);
 
   useEffect(() => {
-    // Refresh user data when dashboard loads to get latest coins
-    if (authenticated && user && refreshUser) {
+    // Refresh user data only once when dashboard loads to get latest coins
+    if (authenticated && user && refreshUser && !hasRefreshed.current) {
+      hasRefreshed.current = true;
       refreshUser();
     }
   }, [authenticated, user, refreshUser]);
-
-  // Debug log to see user data
-  useEffect(() => {
-    if (user) {
-      console.log("User data in dashboard:", user);
-    }
-  }, [user]);
 
   if (loading) {
     return (
@@ -86,8 +81,8 @@ export default function Dashboard() {
       color: "bg-blue-500",
     },
     {
-      title: "Transaction History",
-      description: "View all your transactions",
+      title: "Quiz History",
+      description: "View your quiz wins and losses",
       icon: (
         <svg
           className="w-8 h-8"
@@ -190,7 +185,7 @@ export default function Dashboard() {
                   ₹{user.availableCoins || 0}
                 </p>
                 <p className="text-sm text-duo-text-secondary">
-                  Ready to withdraw
+                  Ready to withdraw (Min: ₹100)
                 </p>
               </div>
             </div>

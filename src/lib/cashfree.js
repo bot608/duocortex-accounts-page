@@ -14,6 +14,12 @@ const CASHFREE_CONFIG = {
  */
 export async function createPaymentSession(orderData) {
   try {
+    // Add return URL for payment callback
+    const baseUrl =
+      typeof window !== "undefined"
+        ? window.location.origin
+        : "http://localhost:3000";
+
     const response = await api.post(
       endpoints.createOrder,
       {
@@ -61,26 +67,16 @@ export async function initiatePayment(sessionId, options = {}) {
       redirectTarget: "_self",
     };
 
-    // Handle the checkout
+    // Handle the checkout - this will redirect to payment gateway
     const result = await cashfree.checkout(checkoutOptions);
 
+    // Note: For redirect flow, this code may not execute as the page will redirect
+    // The callback will be handled by the payment-status page
     if (result.error) {
       if (options.onFailure) {
         options.onFailure(result.error);
       }
       throw new Error(result.error.message || "Payment failed");
-    }
-
-    if (result.redirect) {
-      // Payment was successful, call success handler
-      if (options.onSuccess) {
-        options.onSuccess({
-          order_id: result.order?.orderId,
-          payment_id: result.order?.paymentSessionId,
-          status: "SUCCESS",
-        });
-      }
-      return result;
     }
 
     return result;
@@ -104,10 +100,17 @@ export async function verifyPayment(orderId) {
       `${endpoints.getOrderStatus}?order_id=${orderId}`
     );
 
+    console.log("Payment verification response:", response.data);
+
+    // Handle different possible response formats
+    const orderStatus = response.data.order_status || response.data.status;
+    const isSuccess = orderStatus === "PAID" || orderStatus === "SUCCESS";
+
     return {
-      status: response.data.order_status === "PAID" ? "SUCCESS" : "FAILED",
+      status: isSuccess ? "SUCCESS" : "FAILED",
       order_id: orderId,
-      payment_status: response.data.order_status,
+      payment_status: orderStatus,
+      raw_response: response.data,
     };
   } catch (error) {
     console.error("Error verifying payment:", error);

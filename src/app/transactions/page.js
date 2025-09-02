@@ -10,12 +10,13 @@ import api, { endpoints } from "@/lib/axios";
 export default function Transactions() {
   const { user, authenticated, loading } = useAuth();
   const router = useRouter();
-  const [transactions, setTransactions] = useState([]);
+  const [quizHistory, setQuizHistory] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [transactionsLoading, setTransactionsLoading] = useState(true);
   const [filter, setFilter] = useState("all");
-  const [dateRange, setDateRange] = useState("all");
   const [error, setError] = useState("");
+  const [winAmount, setWinAmount] = useState(0);
+  const [lossAmount, setLossAmount] = useState(0);
 
   useEffect(() => {
     if (!loading && !authenticated) {
@@ -30,72 +31,108 @@ export default function Transactions() {
   }, [authenticated, user]);
 
   useEffect(() => {
+    // Apply filters when filter changes
     applyFilters();
-  }, [transactions, filter, dateRange]);
+  }, [filter, quizHistory]);
+
+  // Calculate win and loss amounts like mobile app
+  const calculateWinLossAmount = (history = []) => {
+    let winAmount = 0;
+    let lossAmount = 0;
+
+    history.forEach((item) => {
+      if (item.won === true) {
+        winAmount += item.winCoins || 0;
+      } else {
+        lossAmount += item.prize || 0;
+      }
+    });
+
+    return {
+      winAmount,
+      lossAmount,
+    };
+  };
 
   const fetchTransactions = async () => {
     try {
       setTransactionsLoading(true);
+      setError("");
+
+      // Fetch quiz history exactly like mobile app
       const response = await api.get(endpoints.quizHistory);
+      const history = response.data.history || [];
 
-      // Transform React Native quiz history data to match our transaction format
-      const quizHistory = response.data.history || [];
-      const transformedTransactions = quizHistory.map((quiz) => ({
-        id: quiz._id || quiz.id,
-        type: quiz.won ? "quiz_win" : "quiz_loss",
-        amount: quiz.won ? quiz.winCoins || 0 : quiz.prize || 0,
-        status: "completed",
-        created_at: quiz.attemptedAt,
-        metadata: {
-          quiz_name: quiz.quizName,
-        },
-      }));
+      setQuizHistory(history);
 
-      setTransactions(transformedTransactions);
+      // Calculate win/loss amounts
+      const {
+        winAmount: calculatedWinAmount,
+        lossAmount: calculatedLossAmount,
+      } = calculateWinLossAmount(history);
+      setWinAmount(calculatedWinAmount);
+      setLossAmount(calculatedLossAmount);
+
+      // Transform for display
+      const transformedTransactions = history
+        .filter((quiz) => quiz && (quiz._id || quiz.id))
+        .map((quiz) => ({
+          id: quiz._id || quiz.id,
+          type: quiz.won ? "quiz_win" : "quiz_loss",
+          amount: quiz.won ? quiz.winCoins || 0 : quiz.prize || 0,
+          status: "completed",
+          created_at:
+            quiz.attemptedAt || quiz.createdAt || new Date().toISOString(),
+          metadata: {
+            quiz_name: quiz.quizName || quiz.name || "Quiz",
+            won: quiz.won,
+          },
+        }));
+
+      setFilteredTransactions(transformedTransactions);
     } catch (err) {
-      console.error("Failed to fetch transactions:", err);
-      setError("Failed to load transaction history");
+      console.error("Failed to fetch quiz history:", err);
+      setError("Failed to load quiz history");
+      setQuizHistory([]);
+      setFilteredTransactions([]);
     } finally {
       setTransactionsLoading(false);
     }
   };
 
   const applyFilters = useCallback(() => {
-    let filtered = [...transactions];
+    if (!quizHistory) return;
 
-    // Filter by type
-    if (filter !== "all") {
-      filtered = filtered.filter((tx) => tx.type === filter);
+    let filtered = quizHistory.filter((quiz) => quiz && (quiz._id || quiz.id));
+
+    // Filter by result type
+    if (filter === "quiz_win") {
+      filtered = filtered.filter((quiz) => quiz.won === true);
+    } else if (filter === "quiz_loss") {
+      filtered = filtered.filter((quiz) => quiz.won === false);
     }
 
-    // Filter by date range
-    if (dateRange !== "all") {
-      const now = new Date();
-      let startDate = new Date();
-
-      switch (dateRange) {
-        case "today":
-          startDate.setHours(0, 0, 0, 0);
-          break;
-        case "week":
-          startDate.setDate(now.getDate() - 7);
-          break;
-        case "month":
-          startDate.setMonth(now.getMonth() - 1);
-          break;
-        case "3months":
-          startDate.setMonth(now.getMonth() - 3);
-          break;
-      }
-
-      filtered = filtered.filter((tx) => new Date(tx.created_at) >= startDate);
-    }
+    // Transform for display
+    const transformedTransactions = filtered.map((quiz) => ({
+      id: quiz._id || quiz.id,
+      type: quiz.won ? "quiz_win" : "quiz_loss",
+      amount: quiz.won ? quiz.winCoins || 0 : quiz.prize || 0,
+      status: "completed",
+      created_at:
+        quiz.attemptedAt || quiz.createdAt || new Date().toISOString(),
+      metadata: {
+        quiz_name: quiz.quizName || quiz.name || "Quiz",
+        won: quiz.won,
+      },
+    }));
 
     // Sort by date (newest first)
-    filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    transformedTransactions.sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+    );
 
-    setFilteredTransactions(filtered);
-  }, [transactions, filter, dateRange]);
+    setFilteredTransactions(transformedTransactions);
+  }, [quizHistory, filter]);
 
   const getTransactionIcon = (type) => {
     switch (type) {
@@ -238,29 +275,58 @@ export default function Transactions() {
 
   return (
     <div className="space-y-6">
-      {/* Balance Overview */}
-      <Card className="bg-duo-bg-purple">
-        <div className="text-center">
-          <h2 className="text-lg font-medium text-duo-text-primary mb-2">
-            Current Balance
-          </h2>
-          <div className="flex items-center justify-center space-x-2">
-            <span className="text-3xl">₹</span>
-            <span className="text-4xl font-bold text-duo-text-primary">
-              {user.coins || "0"}
-            </span>
+      {/* Balance Available - matching mobile app */}
+      <Card>
+        <Card.Content>
+          <div className="border-b border-gray-200 pb-4 mb-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-medium text-duo-text-primary">
+                Balance Available
+              </h2>
+              <div className="flex items-center space-x-1">
+                <span className="text-2xl font-semibold">₹</span>
+                <span className="text-2xl font-light text-black">
+                  {user.coins || "0"}
+                </span>
+              </div>
+            </div>
           </div>
-        </div>
+
+          {/* Total Wins and Losses */}
+          <div className="flex gap-6">
+            <div>
+              <h3 className="text-base font-medium text-duo-text-primary mb-1">
+                Total wins
+              </h3>
+              <div className="flex items-center">
+                <span className="text-xl">₹</span>
+                <span className="text-xl ml-1">{winAmount || "0"}</span>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-base font-medium text-duo-text-primary mb-1">
+                Total losses
+              </h3>
+              <div className="flex items-center">
+                <span className="text-xl">₹</span>
+                <span className="text-xl ml-1">{lossAmount || "0"}</span>
+              </div>
+            </div>
+          </div>
+        </Card.Content>
       </Card>
 
-      {/* Filters and Export */}
+      {/* Transactions Section */}
       <Card>
-        <Card.Header>
-          <Card.Title>Quiz History</Card.Title>
-        </Card.Header>
         <Card.Content>
+          <div className="border-b border-gray-200 pb-3 mb-6">
+            <h2 className="text-base font-normal text-duo-text-primary">
+              Transactions
+            </h2>
+          </div>
+
           <div className="flex flex-wrap gap-4 mb-6">
-            {/* Type Filter */}
+            {/* Filter by Result */}
             <div>
               <label className="block text-sm font-medium text-duo-text-primary mb-2">
                 Filter by Result
@@ -300,120 +366,68 @@ export default function Transactions() {
                 </svg>
               </div>
               <h3 className="text-lg font-medium text-duo-text-primary mb-2">
-                No transactions found
+                No quizzes found
               </h3>
               <p className="text-duo-text-secondary">
                 {filter === "all"
-                  ? "You haven&apos;t made any transactions yet."
-                  : `No ${filter} transactions found.`}
+                  ? "You haven&apos;t attempted any quizzes yet."
+                  : filter === "quiz_win"
+                  ? "No winning quizzes found."
+                  : "No losing quizzes found."}
               </p>
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredTransactions.map((transaction, index) => (
-                <div
-                  key={transaction.id || index}
-                  className="flex items-center justify-between p-4 border border-duo-border rounded-lg hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-center space-x-4">
-                    {getTransactionIcon(transaction.type)}
-                    <div>
-                      <h4 className="font-medium text-duo-text-primary">
-                        {getTransactionTitle(transaction)}
-                      </h4>
-                      <p className="text-sm text-duo-text-secondary">
-                        {new Date(transaction.created_at).toLocaleDateString(
-                          "en-IN",
-                          {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }
-                        )}
-                      </p>
-                    </div>
-                  </div>
+              {filteredTransactions
+                .map((transaction, index) => {
+                  // Safety check for transaction data
+                  if (!transaction || !transaction.id) {
+                    return null;
+                  }
 
-                  <div className="text-right">
-                    <div className="flex items-center space-x-2">
-                      <span
-                        className={`text-lg font-semibold ${
-                          transaction.type === "quiz_win" ||
-                          transaction.type === "recharge"
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        {transaction.type === "quiz_win" ||
-                        transaction.type === "recharge"
-                          ? "+"
-                          : "-"}
-                        ₹{Math.abs(transaction.amount)}
-                      </span>
-                    </div>
-                    <span
-                      className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                        transaction.status
-                      )}`}
+                  return (
+                    <div
+                      key={transaction.id || index}
+                      className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0"
                     >
-                      {transaction.status.charAt(0).toUpperCase() +
-                        transaction.status.slice(1)}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                      {/* Left: Quiz Name and Date */}
+                      <div className="flex-1 max-w-[40%]">
+                        <h4 className="font-medium text-duo-text-primary text-sm">
+                          {transaction.metadata?.quiz_name || "Quiz"}
+                        </h4>
+                        <p className="text-xs text-duo-text-secondary font-light">
+                          {(() => {
+                            try {
+                              return transaction.created_at.slice(0, 10);
+                            } catch (dateError) {
+                              return "Date unavailable";
+                            }
+                          })()}
+                        </p>
+                      </div>
+
+                      {/* Center: Result */}
+                      <div className="flex-1 text-center">
+                        <span className="text-duo-text-secondary font-light">
+                          {transaction.metadata?.won ? "Winning" : "Lost"}
+                        </span>
+                      </div>
+
+                      {/* Right: Amount with Rupee Symbol */}
+                      <div className="flex items-center gap-1">
+                        <span className="text-lg">₹</span>
+                        <span className="text-sm text-duo-text-primary font-light">
+                          {transaction.amount || "0"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+                .filter(Boolean)}
             </div>
           )}
         </Card.Content>
       </Card>
-
-      {/* Transaction Summary */}
-      {filteredTransactions.length > 0 && (
-        <Card>
-          <Card.Header>
-            <Card.Title>Summary</Card.Title>
-          </Card.Header>
-          <Card.Content>
-            <div className="grid md:grid-cols-3 gap-4">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-green-600">
-                  +₹
-                  {filteredTransactions
-                    .filter(
-                      (tx) => tx.type === "quiz_win" || tx.type === "recharge"
-                    )
-                    .reduce((sum, tx) => sum + tx.amount, 0)}
-                </p>
-                <p className="text-sm text-duo-text-secondary">Total Credits</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-red-600">
-                  -₹
-                  {filteredTransactions
-                    .filter(
-                      (tx) =>
-                        tx.type === "quiz_loss" ||
-                        tx.type === "withdrawal" ||
-                        tx.type === "connection_fee"
-                    )
-                    .reduce((sum, tx) => sum + tx.amount, 0)}
-                </p>
-                <p className="text-sm text-duo-text-secondary">Total Debits</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-duo-primary">
-                  {filteredTransactions.length}
-                </p>
-                <p className="text-sm text-duo-text-secondary">
-                  Total Transactions
-                </p>
-              </div>
-            </div>
-          </Card.Content>
-        </Card>
-      )}
     </div>
   );
 }

@@ -145,11 +145,11 @@ export function needsRevalidation() {
   const lastValidation = localStorage.getItem('lastValidation');
   if (!lastValidation) return true;
   
-  // Only revalidate after 5 minutes (300000ms) to prevent continuous calls
-  const fiveMinutes = 5 * 60 * 1000;
+  // Only revalidate after 10 minutes (600000ms) to prevent continuous calls
+  const tenMinutes = 10 * 60 * 1000;
   const timeSinceLastValidation = Date.now() - parseInt(lastValidation);
   
-  return timeSinceLastValidation > fiveMinutes;
+  return timeSinceLastValidation > tenMinutes;
 }
 
 /**
