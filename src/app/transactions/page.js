@@ -370,7 +370,7 @@ export default function Transactions() {
               </h3>
               <p className="text-duo-text-secondary">
                 {filter === "all"
-                  ? "You haven&apos;t attempted any quizzes yet."
+                  ? "You haven't attempted any quizzes yet."
                   : filter === "quiz_win"
                   ? "No winning quizzes found."
                   : "No losing quizzes found."}
