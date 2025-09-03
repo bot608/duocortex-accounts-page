@@ -20,6 +20,17 @@ export const AuthProvider = ({ children }) => {
   const [validating, setValidating] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
+  // Listen for auth changes (like Apple Sign-In completing)
+  useEffect(() => {
+    const handleAuthChange = () => {
+      console.log('AuthContext: Detected auth change event, refreshing state...');
+      setInitialized(false); // Reset to trigger re-initialization
+    };
+    
+    window.addEventListener('authChange', handleAuthChange);
+    return () => window.removeEventListener('authChange', handleAuthChange);
+  }, []);
+
   // Initialize auth state from localStorage
   useEffect(() => {
     const initAuth = async () => {
@@ -113,6 +124,33 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Handle social login (Google, Apple, etc.)
+  const socialLogin = async (userData, token) => {
+    try {
+      setLoading(true);
+      setValidating(true);
+      
+      if (userData && token) {
+        setAuthData(token, userData);
+        setUser(userData);
+        setAuthenticated(true);
+        setInitialized(true);
+        return { success: true };
+      } else {
+        throw new Error('Invalid social login data');
+      }
+    } catch (error) {
+      console.error('Social login error:', error);
+      clearAuthData();
+      setUser(null);
+      setAuthenticated(false);
+      return { success: false, error: error.message };
+    } finally {
+      setValidating(false);
+      setLoading(false);
+    }
+  };
+
   // Handle logout
   const logout = () => {
     clearAuthData();
@@ -152,6 +190,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     authenticated,
     login,
+    socialLogin,
     logout,
     updateUser,
     refreshUser,

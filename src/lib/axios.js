@@ -1,7 +1,9 @@
 import axios from "axios";
 
+import { ENV_CONFIG } from '@/config/environment';
+
 // Use the same backend URL as the mobile app
-const BACKEND_URL = "http://localhost:4000/";
+const BACKEND_URL = ENV_CONFIG.BACKEND_URL;
 
 // Endpoints matching the React Native app exactly
 export const endpoints = {
@@ -27,9 +29,14 @@ const api = axios.create({
 // Request interceptor to add token from localStorage
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("accessToken");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem("accessToken");
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+        console.log('Axios interceptor: Adding token to request', config.url);
+      } else {
+        console.log('Axios interceptor: No token found for request', config.url);
+      }
     }
     return config;
   },

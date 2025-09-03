@@ -13,7 +13,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!loading && !authenticated) {
-      router.push("/");
+      // Check if we have a stored token (might be in process of authentication)
+      const storedToken = localStorage.getItem('accessToken');
+      if (!storedToken) {
+        router.push("/");
+      }
     }
   }, [authenticated, loading, router]);
 
