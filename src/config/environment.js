@@ -1,7 +1,7 @@
 // Environment Configuration
 export const ENV_CONFIG = {
   // Backend URL - use local development server
-  BACKEND_URL: "http://localhost:4000"
+  BACKEND_URL: "https://api.duocortex.com"
 };
 
 // Check if we're in development mode

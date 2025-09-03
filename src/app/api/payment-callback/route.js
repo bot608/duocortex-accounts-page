@@ -6,14 +6,14 @@ export async function POST(request) {
     console.log("Payment callback received:", body);
 
     // Forward the callback to your backend
-    const backendUrl = "http://localhost:4000/api/payment-callback";
+    const backendUrl = "https://api.duocortex.com/api/payment-callback";
 
     const response = await fetch(backendUrl, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(body)
     });
 
     if (response.ok) {
@@ -40,6 +40,6 @@ export async function GET(request) {
   return NextResponse.json({
     success: true,
     message: "Payment callback received",
-    orderId,
+    orderId
   });
 }

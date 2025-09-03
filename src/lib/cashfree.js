@@ -4,7 +4,7 @@ import api, { endpoints } from "./axios";
 const CASHFREE_CONFIG = {
   clientId: process.env.CASHFREE_CLIENT_ID,
   clientSecret: process.env.CASHFREE_CLIENT_SECRET,
-  environment: "SANDBOX", // Change to 'PRODUCTION' for live
+  environment: "SANDBOX" // Change to 'PRODUCTION' for live
 };
 
 /**
@@ -27,14 +27,14 @@ export async function createPaymentSession(orderData) {
         customer_name: orderData.customer_name,
         customer_email: orderData.customer_email,
         customer_phone: orderData.customer_phone || "N/A",
-        order_amount: orderData.amount,
+        order_amount: orderData.amount
       },
       {
         headers: {
           "x-client-id": CASHFREE_CONFIG.clientId,
           "x-client-secret": CASHFREE_CONFIG.clientSecret,
-          "Content-Type": "application/json",
-        },
+          "Content-Type": "application/json"
+        }
       }
     );
 
@@ -59,12 +59,12 @@ export async function initiatePayment(sessionId, options = {}) {
     const { load } = await import("@cashfreepayments/cashfree-js");
 
     const cashfree = await load({
-      mode: CASHFREE_CONFIG.environment.toLowerCase(),
+      mode: CASHFREE_CONFIG.environment.toLowerCase()
     });
 
     const checkoutOptions = {
       paymentSessionId: sessionId,
-      redirectTarget: "_self",
+      redirectTarget: "_self"
     };
 
     // Handle the checkout - this will redirect to payment gateway
@@ -110,7 +110,7 @@ export async function verifyPayment(orderId) {
       status: isSuccess ? "SUCCESS" : "FAILED",
       order_id: orderId,
       payment_status: orderStatus,
-      raw_response: response.data,
+      raw_response: response.data
     };
   } catch (error) {
     console.error("Error verifying payment:", error);
