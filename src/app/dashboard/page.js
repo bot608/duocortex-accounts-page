@@ -13,6 +13,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!loading && !authenticated) {
+      // Check if we're in the middle of processing authentication
+      const isProcessingAuth = sessionStorage.getItem('processingAuth');
+      if (isProcessingAuth) {
+        return; // Don't redirect while processing auth
+      }
+      
       // Check if we have a stored token (might be in process of authentication)
       const storedToken = localStorage.getItem('accessToken');
       if (!storedToken) {

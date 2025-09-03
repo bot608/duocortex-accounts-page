@@ -1,8 +1,20 @@
 import NextAuth from "next-auth";
+import GoogleProvider from "next-auth/providers/google";
 import AppleProvider from "next-auth/providers/apple";
 
 const handler = NextAuth({
   providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      authorization: {
+        params: {
+          prompt: "consent",
+          access_type: "offline",
+          response_type: "code",
+        },
+      },
+    }),
     AppleProvider({
       clientId: process.env.APPLE_ID,
       clientSecret: process.env.APPLE_SECRET,
@@ -29,7 +41,36 @@ const handler = NextAuth({
   },
   callbacks: {
     async signIn({ account, profile, user }) {
-      if (account.provider === "apple") {
+      if (account.provider === "google") {
+        try {
+          const { authenticateWithGoogle } = await import('@/lib/googleAuth');
+          
+          // Create Google user object matching mobile app format
+          const googleUser = {
+            name: profile?.name || user?.name,
+            email: profile?.email || user?.email,
+            picture: profile?.picture || user?.image,
+            sub: profile?.sub || user?.id,
+            id: profile?.sub || user?.id,
+          };
+          
+          const authResult = await authenticateWithGoogle(googleUser);
+          
+          if (authResult.success) {
+            user.backendToken = authResult.token;
+            user.backendUser = authResult.user;
+            return true;
+          } else {
+            console.error('Google Sign-In: Backend authentication failed', authResult.error);
+            // Pass error to login page via URL parameter
+            return `/login?error=AuthError&message=${encodeURIComponent(authResult.error)}`;
+          }
+        } catch (error) {
+          console.error('Google Sign-In: Error during backend authentication', error);
+          const errorMsg = error.response?.data?.message || error.message || 'Google authentication failed';
+          return `/login?error=AuthError&message=${encodeURIComponent(errorMsg)}`;
+        }
+      } else if (account.provider === "apple") {
         try {
           const { authenticateWithApple } = await import('@/lib/appleAuth');
           
@@ -48,13 +89,15 @@ const handler = NextAuth({
           if (authResult.success) {
             user.backendToken = authResult.token;
             user.backendUser = authResult.user;
-            user.isNewUser = authResult.isNewUser;
             return true;
           }
-          return false;
+          console.error('Apple Sign-In: Backend authentication failed', authResult.error);
+          // Pass error to login page via URL parameter
+          return `/login?error=AuthError&message=${encodeURIComponent(authResult.error)}`;
         } catch (error) {
-          console.error('Apple Sign-In error:', error);
-          return false;
+          console.error('Apple Sign-In: Error during backend authentication', error);
+          const errorMsg = error.response?.data?.message || error.message || 'Apple authentication failed';
+          return `/login?error=AuthError&message=${encodeURIComponent(errorMsg)}`;
         }
       }
       return true;
@@ -72,7 +115,6 @@ const handler = NextAuth({
       if (user?.backendToken) {
         token.backendToken = user.backendToken;
         token.backendUser = user.backendUser;
-        token.isNewUser = user.isNewUser;
       }
       return token;
     },
@@ -82,7 +124,6 @@ const handler = NextAuth({
       session.providerId = token.providerId;
       session.backendToken = token.backendToken;
       session.backendUser = token.backendUser;
-      session.isNewUser = token.isNewUser;
       return session;
     },
   },

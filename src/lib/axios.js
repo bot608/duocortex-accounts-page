@@ -5,11 +5,9 @@ import { ENV_CONFIG } from '@/config/environment';
 // Use the same backend URL as the mobile app
 const BACKEND_URL = ENV_CONFIG.BACKEND_URL;
 
-// Endpoints matching the React Native app exactly
+// API endpoints
 export const endpoints = {
   login: "auth/login",
-  register: "auth/register",
-  verifyOtp: "auth/verify-otp",
   profileUpdate: "user/update",
   getProfile: "user/user-details",
   requestWithdrawal: "user/request-withdrawal",

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signIn, useSession, signOut } from "next-auth/react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -10,47 +10,66 @@ import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import { ENV_CONFIG } from "@/config/environment";
 import axios from "axios";
 
-export default function Login() {
+function LoginComponent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isProcessingAuth, setIsProcessingAuth] = useState(false);
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const processedSession = useRef(null);
 
   useEffect(() => {
+    // Handle URL error parameters from NextAuth
+    const errorParam = searchParams.get('error');
+    const messageParam = searchParams.get('message');
+    
+    if (errorParam === 'AccessDenied' || errorParam === 'AuthError') {
+      if (messageParam) {
+        setError(decodeURIComponent(messageParam));
+      } else {
+        setError('Authentication failed. Please try again.');
+      }
+      // Clean up the URL without reloading the page
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
+
     if (status === "authenticated" && session) {
       const sessionId = `${session.provider}-${session.providerId}-${session.backendToken}`;
       if (processedSession.current === sessionId) {
         return;
       }
       
-      if (session.provider === "apple" && session.backendToken) {
+      if ((session.provider === "apple" || session.provider === "google") && session.backendToken) {
         processedSession.current = sessionId;
+        setIsProcessingAuth(true);
         
         localStorage.setItem('accessToken', session.backendToken);
         if (session.backendUser) {
           localStorage.setItem('userInfo', JSON.stringify(session.backendUser));
         }
         
-        signOut({ redirect: false });
-        
-        setTimeout(() => {
+        // Set a flag to prevent redirect conflicts and clear NextAuth session
+        sessionStorage.setItem('processingAuth', 'true');
+        signOut({ redirect: false }).then(() => {
           window.dispatchEvent(new CustomEvent('authChange'));
-          router.push(session.isNewUser ? '/profile?from=signup' : '/dashboard');
-        }, 1500);
-      } else if (session.provider !== "apple") {
+          sessionStorage.removeItem('processingAuth');
+          router.push('/dashboard');
+        });
+      } else if (session.provider !== "apple" && session.provider !== "google") {
         router.push("/dashboard");
       }
-    } else if (status === "unauthenticated") {
+    } else if (status === "unauthenticated" && !isProcessingAuth) {
       const storedToken = localStorage.getItem('accessToken');
       if (storedToken && window.location.pathname === '/login') {
         router.push('/dashboard');
       }
     }
-  }, [status, session, router]);
+  }, [status, session, router, searchParams, isProcessingAuth]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -96,8 +115,7 @@ export default function Login() {
   const handleGoogleSignIn = async () => {
     try {
       setError("");
-      // Use the direct backend redirect approach (matching frontend)
-      window.location.href = `${ENV_CONFIG.BACKEND_URL}/auth/google`;
+      await signIn("google", { callbackUrl: "/dashboard" });
     } catch (error) {
       setError("Failed to initiate Google Sign-In");
       console.error("Google Sign-In error:", error);
@@ -114,7 +132,7 @@ export default function Login() {
     }
   };
 
-  if (status === "loading") {
+  if (status === "loading" || isProcessingAuth) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-white">
         <LoadingSpinner size="large" />
@@ -123,7 +141,11 @@ export default function Login() {
   }
 
   if (status === "authenticated") {
-    return null;
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-white">
+        <LoadingSpinner size="large" />
+      </div>
+    );
   }
 
   return (
@@ -171,15 +193,6 @@ export default function Login() {
               </button>
             </div>
 
-            <div className="text-right">
-              <button
-                type="button"
-                onClick={() => router.push("/forgot-password")}
-                className="text-sm text-gray-600 hover:text-gray-900"
-              >
-                Forgot the password?
-              </button>
-            </div>
 
             {error && (
               <div className="text-sm text-center text-red-600">{error}</div>
@@ -251,5 +264,13 @@ export default function Login() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function Login() {
+  return (
+    <Suspense fallback={<div className="flex justify-center items-center min-h-screen bg-white"><LoadingSpinner size="large" /></div>}>
+      <LoginComponent />
+    </Suspense>
   );
 }

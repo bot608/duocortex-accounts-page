@@ -1,14 +1,7 @@
 // Environment Configuration
 export const ENV_CONFIG = {
-  // Google OAuth Configuration
-  GOOGLE_CLIENT_ID:
-    "275251104501-tnp33sfbl98tksth0lujs2k9kjqhnl3i.apps.googleusercontent.com",
-
   // Backend URL - use local development server
-  BACKEND_URL: "http://localhost:4000",
-
-  // OAuth Redirect URLs (handled automatically by NextAuth.js)
-  GOOGLE_REDIRECT_URI: `https://1fbf1a9ba555.ngrok-free.app/api/auth/callback/google`,
+  BACKEND_URL: "http://localhost:4000"
 };
 
 // Check if we're in development mode

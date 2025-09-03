@@ -1,93 +1,57 @@
+import axios from 'axios';
 import { ENV_CONFIG } from '@/config/environment';
 
 /**
- * Initiate Google Sign-In (redirect to backend OAuth endpoint)
- * This matches the frontend implementation
+ * Generate a device ID for web client
  */
-export function initiateGoogleSignIn() {
-  try {
-    window.location.href = `${ENV_CONFIG.BACKEND_URL}/auth/google`;
-  } catch (error) {
-    console.error('Google Sign-In error:', error);
-    throw error;
+function generateWebDeviceId() {
+  if (typeof window === 'undefined') {
+    return `web-server-${Date.now()}-${Math.random().toString(36).substring(2)}`;
   }
+  return `web-client-${Date.now()}-${Math.random().toString(36).substring(2)}`;
 }
 
 /**
- * Handle Google OAuth callback from URL parameters
- * This matches the frontend GoogleLogin component logic
+ * Authenticate with Google using NextAuth user data
+ * @param {Object} googleUser - Google user object from NextAuth
  * @returns {Promise<Object>} Authentication result
  */
-export async function handleGoogleCallback() {
+export async function authenticateWithGoogle(googleUser) {
   try {
-    const url = window.location.href;
-    let accessToken = null;
-    let error = null;
-
-    if (url.includes('?')) {
-      const queryString = url.split('?')[1];
-      const queryParams = queryString.split('&');
-
-      for (let param of queryParams) {
-        const [key, value] = param.split('=');
-        if (key === 'accessToken') {
-          accessToken = decodeURIComponent(value);
-        }
-        if (key === 'error') {
-          error = decodeURIComponent(value);
-        }
-      }
-    }
-
-    if (error) {
-      return {
-        success: false,
-        error: error,
-        isAccountSuspended: error === 'Account suspended by admin'
-      };
-    }
+    const profileData = {
+      name: googleUser.name,
+      email: googleUser.email,
+      photo: googleUser.picture,
+      googleId: googleUser.id || googleUser.sub,
+      device_id: generateWebDeviceId(),
+    };
     
-    if (accessToken) {
+    const response = await axios.post(`${ENV_CONFIG.BACKEND_URL}/auth/login`, profileData, {
+      timeout: 30000,
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    if (response.data && response.data.token) {
       return {
         success: true,
-        token: accessToken,
-        user: null // User data will be fetched by AuthContext
+        token: response.data.token,
+        user: response.data.user || { 
+          email: googleUser.email, 
+          name: googleUser.name, 
+          googleId: googleUser.id 
+        },
+        isNewUser: response.data.isNewUser || false,
       };
     }
     
     return {
       success: false,
-      error: 'No access token found in the URL!'
+      error: response.data.message || 'Google authentication failed',
     };
-  } catch (err) {
-    console.error('Google callback error:', err);
+  } catch (error) {
     return {
       success: false,
-      error: 'An error occurred while processing Google authentication!'
+      error: error.response?.data?.message || error.message || 'Google authentication failed',
     };
   }
-}
-
-/**
- * Show account suspended dialog (matches frontend implementation)
- * @param {Function} onContactAdmin - Callback when user clicks contact admin
- * @returns {Promise<boolean>} Whether user chose to contact admin
- */
-export async function showAccountSuspendedDialog(onContactAdmin) {
-  // This would typically use a modal library like SweetAlert2
-  // For now, we'll use a simple confirm dialog
-  const shouldContact = confirm(
-    'Account Suspended By Admin\n\nIf this is a mistake, please contact the admin with the registered email.\n\nClick OK to contact admin via email.'
-  );
-  
-  if (shouldContact) {
-    const subject = encodeURIComponent('Account Suspension Appeal');
-    window.open(
-      `https://mail.google.com/mail/?view=cm&fs=1&to=noreplyduocortex@gmail.com&su=${subject}`,
-      '_blank'
-    );
-    if (onContactAdmin) onContactAdmin();
-  }
-  
-  return shouldContact;
 }
